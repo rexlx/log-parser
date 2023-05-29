@@ -113,18 +113,16 @@ func (a *Application) getStats(wg *sync.WaitGroup, records []*Record) {
 		stats[record.Binary]++
 	}
 	a.syncResults(stats)
-	log.Println(len(records), "records processed..")
+	fmt.Println(len(records), "records processed..")
 }
 
 func (a *Application) Run() {
-	log.Println("starting work..")
 	var wg sync.WaitGroup
 	for _, job := range a.WorkLoad {
 		wg.Add(1)
 		go a.getStats(&wg, job)
 	}
 	wg.Wait()
-	log.Println("hard work complete:")
 }
 
 func (a *Application) prettyPrint() {
@@ -146,7 +144,6 @@ func (a *Application) prettyPrint() {
 }
 
 func readInFile(wg *sync.WaitGroup, path string, lib *Lib) {
-	// fmt.Println("reading", path)
 	defer wg.Done()
 	var records []*Record
 	data, err := os.ReadFile(path)
@@ -156,13 +153,12 @@ func readInFile(wg *sync.WaitGroup, path string, lib *Lib) {
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
 		var r Record
 		if err := json.Unmarshal(line, &r); err != nil {
-			fmt.Println(err)
+			fmt.Println("json marshalling issue:", err)
 			continue
 		}
 		records = append(records, &r)
 	}
 	lib.storeRecords(records)
-	// log.Println("read in ->", path)
 }
 
 // func multiRead(records []*Record, err error) {}
