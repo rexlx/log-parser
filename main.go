@@ -38,13 +38,20 @@ type Record struct {
 }
 
 var (
-	path = flag.String("src", "", "source log or directory")
+	rate   = flag.Int("read", 5, "how many files to read in at once")
+	path   = flag.String("src", "", "source log or directory")
+	stalk  = flag.String("stalk", "", "systemd unit to follow")
+	step   = flag.Int("step", 8, "chunk size")
+	amount = flag.Int("show", 25, "amount of stats to show")
+	level  = flag.Int64("level", 5, "error level")
 )
 
 func main() {
 	start := time.Now()
+
 	flag.Parse()
 	files := flag.Args()
+
 	results := make(map[string]int)
 
 	app := Application{
@@ -54,37 +61,24 @@ func main() {
 		Result: results,
 	}
 
-	// var wg sync.WaitGroup
+	fileList := WalkFiles(files, *rate)
 
-	fileList := WalkFiles(files, 10)
 	for _, i := range fileList {
 		app.getRecords(*path, i)
 	}
-	// 	wg.Add(1)
-	// 	go func(path string, files []string) {
-	// 		defer wg.Done()
-	// 		app.getRecords(path, files)
-	// 	}(*path, i)
 
-	// wg.Wait()
+	app.createWorkload(*step)
+	app.processWorkload(*level)
+	app.stalkService(*stalk)
+	app.summarizeResults(*amount)
 
-	app.setStep()
-
-	app.run()
-
-	runtime := time.Since(start)
-
-	app.prettyPrint()
-
-	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], runtime.Seconds())
-	fmt.Printf("detected %v errors (priority<5)\t%v%v\n", app.Result["_error"], float64(app.Result["_error"])/float64(app.Result["_total"])*100, "%")
+	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 }
 
-func (a *Application) setStep() {
-
+func (a *Application) createWorkload(size int) {
 	var allData [][]*Record
 	total := len(a.Data)
-	chunkSize := total / 8
+	chunkSize := total / size
 	for i := 0; i < total; i += chunkSize {
 		end := i + chunkSize
 
@@ -104,14 +98,16 @@ func (a *Application) syncResults(result map[string]int) {
 	}
 }
 
-func (a *Application) getStats(wg *sync.WaitGroup, records []*Record) {
+func (a *Application) getStats(wg *sync.WaitGroup, records []*Record, level int64) {
 	defer wg.Done()
+
 	stats := make(map[string]int)
 	stats["_error"] = 0
 	stats["_total"] = 0
+
 	for _, record := range records {
 		// _ = InterfaceToByteSlice(record.Message)
-		if record.Priority < 5 {
+		if record.Priority < level {
 			stats["_error"]++
 		}
 		stats[record.Unit]++
@@ -121,16 +117,18 @@ func (a *Application) getStats(wg *sync.WaitGroup, records []*Record) {
 	fmt.Println(len(records), "records processed..")
 }
 
-func (a *Application) run() {
+func (a *Application) processWorkload(level int64) {
 	var wg sync.WaitGroup
 	for _, job := range a.WorkLoad {
 		wg.Add(1)
-		go a.getStats(&wg, job)
+		go a.getStats(&wg, job, level)
 	}
 	wg.Wait()
 }
 
-func (a *Application) prettyPrint() {
+func (a *Application) summarizeResults(amount int) {
+	fmt.Printf("detected %v errors (priority<5)\t%v%v\n", a.Result["_error"], float64(a.Result["_error"])/float64(a.Result["_total"])*100, "%")
+
 	for k, v := range a.Result {
 		a.Counts = append(a.Counts, Counter{
 			Name:      k,
@@ -140,7 +138,12 @@ func (a *Application) prettyPrint() {
 
 	}
 	SortCounts(a.Counts)
-	out, err := json.Marshal(a.Counts)
+
+	if amount > len(a.Counts) {
+		amount = len(a.Counts)
+	}
+
+	out, err := json.MarshalIndent(a.Counts[0:amount], "", "  ")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -197,6 +200,24 @@ func (a *Application) storeRecords(records []*Record) {
 
 }
 
+func (a *Application) stalkService(service string) {
+	if service != "" {
+		var wg sync.WaitGroup
+		for _, load := range a.WorkLoad {
+			wg.Add(1)
+			go func(l []*Record, s string) {
+				defer wg.Done()
+				for _, i := range l {
+					if i.Unit == s {
+						fmt.Println(i.Priority, string(InterfaceToByteSlice(i.Message)))
+					}
+				}
+			}(load, service)
+		}
+		wg.Wait()
+	}
+}
+
 func InterfaceToByteSlice(i interface{}) []byte {
 	arr, ok := i.([]interface{})
 	str, ko := i.(string)
@@ -208,7 +229,6 @@ func InterfaceToByteSlice(i interface{}) []byte {
 				out = append(out, uint8(x))
 			}
 		}
-		fmt.Println(string(out), "bleh")
 		return out
 	}
 	if ko {
