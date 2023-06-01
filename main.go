@@ -110,6 +110,7 @@ func (a *Application) getStats(wg *sync.WaitGroup, records []*Record) {
 	stats["_error"] = 0
 	stats["_total"] = 0
 	for _, record := range records {
+		// _ = InterfaceToByteSlice(record.Message)
 		if record.Priority < 5 {
 			stats["_error"]++
 		}
@@ -167,8 +168,6 @@ func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
 	f(records)
 }
 
-// func multiRead(records []*Record, err error) {}
-
 // returns a list of files
 func (a *Application) getRecords(path string, files []string) {
 	fInfo, err := os.Stat(path)
@@ -191,17 +190,37 @@ func (a *Application) getRecords(path string, files []string) {
 	}
 }
 
-func SortCounts(counts []Counter) {
-	sort.Slice(counts, func(i, j int) bool {
-		return counts[i].Occurence > counts[j].Occurence
-	})
-}
-
 func (a *Application) storeRecords(records []*Record) {
 	a.Mx.Lock()
 	defer a.Mx.Unlock()
 	a.Data = append(a.Data, records...)
 
+}
+
+func InterfaceToByteSlice(i interface{}) []byte {
+	arr, ok := i.([]interface{})
+	str, ko := i.(string)
+	if ok {
+		var out []byte
+		for _, item := range arr {
+			x, ok := item.(float64)
+			if ok {
+				out = append(out, uint8(x))
+			}
+		}
+		fmt.Println(string(out), "bleh")
+		return out
+	}
+	if ko {
+		return []byte(str)
+	}
+	return []byte{}
+}
+
+func SortCounts(counts []Counter) {
+	sort.Slice(counts, func(i, j int) bool {
+		return counts[i].Occurence > counts[j].Occurence
+	})
 }
 
 func WalkFiles(files []string, step int) [][]string {
