@@ -54,17 +54,19 @@ func main() {
 		Result: results,
 	}
 
-	var wg sync.WaitGroup
+	// var wg sync.WaitGroup
 
-	fileList := WalkFiles(files, 4)
+	fileList := WalkFiles(files, 10)
 	for _, i := range fileList {
-		wg.Add(1)
-		go func(path string, files []string) {
-			defer wg.Done()
-			app.getRecords(path, files)
-		}(*path, i)
+		app.getRecords(*path, i)
 	}
-	wg.Wait()
+	// 	wg.Add(1)
+	// 	go func(path string, files []string) {
+	// 		defer wg.Done()
+	// 		app.getRecords(path, files)
+	// 	}(*path, i)
+
+	// wg.Wait()
 
 	app.setStep()
 
