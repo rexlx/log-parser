@@ -28,24 +28,17 @@ type Application struct {
 }
 
 type Record struct {
-	LogID    string `json:"syslog_identifier"`
-	Time     uint64 `json:"_source_realtime_timestamp,string"`
-	Command  string `json:"_cmdline"`
-	Binary   string `json:"_exe"`
-	Unit     string `json:"_systemd_unit"`
-	Priority int64  `json:"priority,string"`
-	Message  string `json:"message"`
-}
-
-type Lib struct {
-	TotalRecords int
-	Mx           *sync.RWMutex
-	Data         []*Record
+	LogID    string      `json:"syslog_identifier"`
+	Time     uint64      `json:"_source_realtime_timestamp,string"`
+	Command  string      `json:"_cmdline"`
+	Binary   string      `json:"_exe"`
+	Unit     string      `json:"_systemd_unit"`
+	Priority int64       `json:"priority,string"`
+	Message  interface{} `json:"message"`
 }
 
 var (
 	path = flag.String("src", "", "source log or directory")
-	// out  = flag.Bool("out", false, "")
 )
 
 func main() {
@@ -53,30 +46,36 @@ func main() {
 	flag.Parse()
 	files := flag.Args()
 	results := make(map[string]int)
-	library := Lib{
-		Data: []*Record{},
-		Mx:   &sync.RWMutex{},
-	}
-
-	data, err := GetRecords(*path, files, &library)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	library.TotalRecords = len(data)
 
 	app := Application{
-		Data:   data,
+		Data:   []*Record{},
 		Counts: []Counter{},
 		Mx:     &sync.RWMutex{},
 		Result: results,
 	}
 
+	var wg sync.WaitGroup
+
+	fileList := WalkFiles(files, 4)
+	for _, i := range fileList {
+		wg.Add(1)
+		go func(path string, files []string) {
+			defer wg.Done()
+			app.getRecords(path, files)
+		}(*path, i)
+	}
+	wg.Wait()
+
 	app.setStep()
-	app.Run()
+
+	app.run()
+
 	runtime := time.Since(start)
+
 	app.prettyPrint()
-	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), library.TotalRecords, runtime.Seconds())
+
+	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], runtime.Seconds())
+	fmt.Printf("detected %v errors (priority<5)\t%v%v\n", app.Result["_error"], float64(app.Result["_error"])/float64(app.Result["_total"])*100, "%")
 }
 
 func (a *Application) setStep() {
@@ -106,17 +105,20 @@ func (a *Application) syncResults(result map[string]int) {
 func (a *Application) getStats(wg *sync.WaitGroup, records []*Record) {
 	defer wg.Done()
 	stats := make(map[string]int)
+	stats["_error"] = 0
+	stats["_total"] = 0
 	for _, record := range records {
-		if record.Binary == "" && record.LogID != "" {
-			record.Binary = record.LogID
+		if record.Priority < 5 {
+			stats["_error"]++
 		}
-		stats[record.Binary]++
+		stats[record.Unit]++
+		stats["_total"]++
 	}
 	a.syncResults(stats)
 	fmt.Println(len(records), "records processed..")
 }
 
-func (a *Application) Run() {
+func (a *Application) run() {
 	var wg sync.WaitGroup
 	for _, job := range a.WorkLoad {
 		wg.Add(1)
@@ -143,7 +145,8 @@ func (a *Application) prettyPrint() {
 	fmt.Println(string(out))
 }
 
-func readInFile(wg *sync.WaitGroup, path string, lib *Lib) {
+func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
+	// var c int
 	defer wg.Done()
 	var records []*Record
 	data, err := os.ReadFile(path)
@@ -151,6 +154,7 @@ func readInFile(wg *sync.WaitGroup, path string, lib *Lib) {
 		log.Fatalln(err)
 	}
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
+		// c++
 		var r Record
 		if err := json.Unmarshal(line, &r); err != nil {
 			fmt.Println("json marshalling issue:", err)
@@ -158,31 +162,31 @@ func readInFile(wg *sync.WaitGroup, path string, lib *Lib) {
 		}
 		records = append(records, &r)
 	}
-	lib.storeRecords(records)
+	f(records)
 }
 
 // func multiRead(records []*Record, err error) {}
 
 // returns a list of files
-func GetRecords(path string, files []string, lib *Lib) ([]*Record, error) {
+func (a *Application) getRecords(path string, files []string) {
 	fInfo, err := os.Stat(path)
 	if err != nil {
-		return []*Record{}, err
+		fmt.Println(err)
+		return
 	}
 	if fInfo.IsDir() && len(files) > 0 {
 		var wg sync.WaitGroup
 		wg.Add(len(files))
 		for _, fh := range files {
-			go readInFile(&wg, filepath.Join(path, fh), lib)
+			go readInFile(&wg, filepath.Join(path, fh), a.storeRecords)
 		}
 		wg.Wait()
 	} else {
 		var wg sync.WaitGroup
 		wg.Add(1)
-		readInFile(&wg, path, lib)
+		readInFile(&wg, path, a.storeRecords)
 		wg.Wait()
 	}
-	return lib.Data, nil
 }
 
 func SortCounts(counts []Counter) {
@@ -191,9 +195,27 @@ func SortCounts(counts []Counter) {
 	})
 }
 
-func (l *Lib) storeRecords(records []*Record) {
-	l.Mx.Lock()
-	defer l.Mx.Unlock()
-	l.Data = append(l.Data, records...)
+func (a *Application) storeRecords(records []*Record) {
+	a.Mx.Lock()
+	defer a.Mx.Unlock()
+	a.Data = append(a.Data, records...)
 
+}
+
+func WalkFiles(files []string, step int) [][]string {
+	var fileList [][]string
+	if len(files) <= step {
+		fileList = append(fileList, files)
+		return fileList
+	}
+	total := len(files)
+	for i := 0; i < total; i += step {
+		end := i + step
+
+		if end > total {
+			end = total
+		}
+		fileList = append(fileList, files[i:end])
+	}
+	return fileList
 }
