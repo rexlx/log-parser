@@ -78,7 +78,7 @@ func main() {
 		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	} else {
 		scanner := bufio.NewScanner(os.Stdin)
-		ScanStream(scanner)
+		app.scanStream(scanner)
 	}
 }
 
@@ -105,9 +105,7 @@ func (a *Application) syncResults(result map[string]int) {
 	}
 }
 
-func (a *Application) getStats(wg *sync.WaitGroup, records []*Record, level int64) {
-	defer wg.Done()
-
+func (a *Application) getStats(records []*Record, level int64) {
 	stats := make(map[string]int)
 	stats["_error"] = 0
 	stats["_total"] = 0
@@ -128,19 +126,24 @@ func (a *Application) processWorkload(level int64) {
 	var wg sync.WaitGroup
 	for _, job := range a.WorkLoad {
 		wg.Add(1)
-		go a.getStats(&wg, job, level)
+		go func(job []*Record, level int64) {
+			defer wg.Done()
+			a.getStats(job, level)
+		}(job, level)
 	}
 	wg.Wait()
 }
 
 func (a *Application) summarizeResults(amount int) {
-	fmt.Printf("detected %v errors (priority<5)\t%v%v\n", a.Result["_error"], float64(a.Result["_error"])/float64(a.Result["_total"])*100, "%")
-
+	// fmt.Printf("detected %v errors (priority<5)\t%v%v\n", a.Result["_error"], float64(a.Result["_error"])/float64(a.Result["_total"])*100, "%")
 	for k, v := range a.Result {
+		p := (float64(v) / float64(len(a.Data)) * 100)
+
+		fmt.Println(p, "HHHHHH")
 		a.Counts = append(a.Counts, Counter{
 			Name:      k,
 			Occurence: v,
-			Percent:   (float64(v) / float64(len(a.Data)) * 100),
+			Percent:   p,
 		})
 
 	}
@@ -150,9 +153,11 @@ func (a *Application) summarizeResults(amount int) {
 		amount = len(a.Counts)
 	}
 
+	fmt.Println(a.Counts)
+
 	out, err := json.MarshalIndent(a.Counts[0:amount], "", "  ")
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Println(err)
 	}
 
 	fmt.Println(string(out))
