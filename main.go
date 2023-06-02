@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"flag"
@@ -44,6 +45,7 @@ var (
 	step   = flag.Int("step", 8, "chunk size")
 	amount = flag.Int("show", 25, "amount of stats to show")
 	level  = flag.Int64("level", 5, "error level")
+	scan   = flag.Bool("scan", false, "read from log stream")
 )
 
 func main() {
@@ -61,18 +63,23 @@ func main() {
 		Result: results,
 	}
 
-	fileList := WalkFiles(files, *rate)
+	if !*scan {
+		fileList := WalkFiles(files, *rate)
 
-	for _, i := range fileList {
-		app.getRecords(*path, i)
+		for _, i := range fileList {
+			app.getRecords(*path, i)
+		}
+
+		app.createWorkload(*step)
+		app.processWorkload(*level)
+		app.stalkService(*stalk)
+		app.summarizeResults(*amount)
+
+		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
+	} else {
+		scanner := bufio.NewScanner(os.Stdin)
+		ScanStream(scanner)
 	}
-
-	app.createWorkload(*step)
-	app.processWorkload(*level)
-	app.stalkService(*stalk)
-	app.summarizeResults(*amount)
-
-	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 }
 
 func (a *Application) createWorkload(size int) {
@@ -152,7 +159,6 @@ func (a *Application) summarizeResults(amount int) {
 }
 
 func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
-	// var c int
 	defer wg.Done()
 	var records []*Record
 	data, err := os.ReadFile(path)
@@ -160,7 +166,6 @@ func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
 		log.Fatalln(err)
 	}
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
-		// c++
 		var r Record
 		if err := json.Unmarshal(line, &r); err != nil {
 			fmt.Println("json marshalling issue:", err)
