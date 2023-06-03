@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (a *Application) scanStream(scanner *bufio.Scanner, stalk string) {
+func (a *Application) scanStream(scanner *bufio.Scanner, stalk string, amount int) {
 	var records []*Record
 	tick := time.NewTicker(666 * time.Millisecond)
 	end := time.After(666 * time.Minute)
@@ -23,7 +23,7 @@ func (a *Application) scanStream(scanner *bufio.Scanner, stalk string) {
 				a.summarizeResults(a.Result, 25)
 			} else {
 				fmt.Print("\033[2J")
-				a.stalkService(stalk)
+				a.stalkService(stalk, amount)
 				a.summarizeResults(a.ServiceDetails, 5)
 				// a.summarizeResults(6)
 			}

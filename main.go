@@ -75,13 +75,13 @@ func main() {
 
 		app.createWorkload(*step)
 		app.processWorkload(*level)
-		app.stalkService(*stalk)
+		app.stalkService(*stalk, *amount)
 		app.summarizeResults(app.Result, *amount)
 
 		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	} else {
 		scanner := bufio.NewScanner(os.Stdin)
-		app.scanStream(scanner, *stalk)
+		app.scanStream(scanner, *stalk, *amount)
 	}
 }
 
@@ -151,16 +151,6 @@ func GetMaxLen(c []Counter) int {
 	return len(l.Name)
 }
 
-func MaxLen(arr []string) int {
-	x := arr[0]
-	for _, item := range arr {
-		if len(item) > len(x) {
-			x = item
-		}
-	}
-	return len(x)
-}
-
 func (a *Application) summarizeResults(results map[string]int, amount int) {
 	if len(results) < 1 {
 		return
@@ -227,8 +217,9 @@ func (a *Application) syncServiceCounter(sc map[string]int) {
 	}
 }
 
-func (a *Application) stalkService(service string) {
+func (a *Application) stalkService(service string, amount int) {
 	if service != "" {
+		var pairs []Counter
 		var wg sync.WaitGroup
 		for _, load := range a.WorkLoad {
 			wg.Add(1)
@@ -244,6 +235,26 @@ func (a *Application) stalkService(service string) {
 			}(load, service)
 		}
 		wg.Wait()
+		// sort.Slice(counts, func(i, j int) bool {
+		// 	return counts[i].Occurence > counts[j].Occurence
+		// })
+		for k, v := range a.ServiceDetails {
+			pairs = append(pairs, Counter{
+				Name:      k,
+				Occurence: v,
+			})
+		}
+		SortCounts(pairs)
+		if amount > len(pairs) {
+			amount = len(pairs)
+		}
+		maxLen := GetMaxLen(pairs[0:amount])
+		if maxLen > 16 {
+			maxLen = 16
+		}
+		for _, i := range pairs[0:amount] {
+			fmt.Printf("%-*s %v\n", maxLen, i.Name, i.Occurence)
+		}
 	}
 }
 
