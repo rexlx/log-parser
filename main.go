@@ -21,11 +21,12 @@ type Counter struct {
 }
 
 type Application struct {
-	WorkLoad [][]*Record
-	Data     []*Record
-	Counts   []Counter
-	Result   map[string]int
-	Mx       *sync.RWMutex
+	WorkLoad       [][]*Record
+	ServiceDetails map[string]int
+	Data           []*Record
+	Counts         []Counter
+	Result         map[string]int
+	Mx             *sync.RWMutex
 }
 
 type Record struct {
@@ -55,12 +56,14 @@ func main() {
 	files := flag.Args()
 
 	results := make(map[string]int)
+	serviceDetails := make(map[string]int)
 
 	app := Application{
-		Data:   []*Record{},
-		Counts: []Counter{},
-		Mx:     &sync.RWMutex{},
-		Result: results,
+		Data:           []*Record{},
+		Counts:         []Counter{},
+		Mx:             &sync.RWMutex{},
+		Result:         results,
+		ServiceDetails: serviceDetails,
 	}
 
 	if !*scan {
@@ -73,26 +76,30 @@ func main() {
 		app.createWorkload(*step)
 		app.processWorkload(*level)
 		app.stalkService(*stalk)
-		app.summarizeResults(*amount)
+		app.summarizeResults(app.Result, *amount)
 
 		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	} else {
 		scanner := bufio.NewScanner(os.Stdin)
-		app.scanStream(scanner)
+		app.scanStream(scanner, *stalk)
 	}
 }
 
 func (a *Application) createWorkload(size int) {
 	var allData [][]*Record
 	total := len(a.Data)
-	chunkSize := total / size
-	for i := 0; i < total; i += chunkSize {
-		end := i + chunkSize
+	if total < size {
+		allData = append(allData, a.Data)
+	} else {
+		chunkSize := total / size
+		for i := 0; i < total; i += chunkSize {
+			end := i + chunkSize
 
-		if end > total {
-			end = total
+			if end > total {
+				end = total
+			}
+			allData = append(allData, a.Data[i:end])
 		}
-		allData = append(allData, a.Data[i:end])
 	}
 	a.WorkLoad = allData
 }
@@ -119,7 +126,7 @@ func (a *Application) getStats(records []*Record, level int64) {
 		stats["_total"]++
 	}
 	a.syncResults(stats)
-	fmt.Println(len(records), "records processed..")
+	// fmt.Println(len(records), "records processed..")
 }
 
 func (a *Application) processWorkload(level int64) {
@@ -134,51 +141,53 @@ func (a *Application) processWorkload(level int64) {
 	wg.Wait()
 }
 
-func (a *Application) summarizeResults(amount int) {
-	// fmt.Printf("detected %v errors (priority<5)\t%v%v\n", a.Result["_error"], float64(a.Result["_error"])/float64(a.Result["_total"])*100, "%")
-	for k, v := range a.Result {
+func GetMaxLen(c []Counter) int {
+	l := c[0]
+	for _, s := range c {
+		if len(s.Name) > len(l.Name) {
+			l = s
+		}
+	}
+	return len(l.Name)
+}
+
+func MaxLen(arr []string) int {
+	x := arr[0]
+	for _, item := range arr {
+		if len(item) > len(x) {
+			x = item
+		}
+	}
+	return len(x)
+}
+
+func (a *Application) summarizeResults(results map[string]int, amount int) {
+	if len(results) < 1 {
+		return
+	}
+	var counts []Counter
+	for k, v := range results {
 		p := (float64(v) / float64(len(a.Data)) * 100)
 
-		fmt.Println(p, "HHHHHH")
-		a.Counts = append(a.Counts, Counter{
+		counts = append(counts, Counter{
 			Name:      k,
 			Occurence: v,
 			Percent:   p,
 		})
 
 	}
-	SortCounts(a.Counts)
+	SortCounts(counts)
 
-	if amount > len(a.Counts) {
-		amount = len(a.Counts)
+	if amount > len(counts) {
+		amount = len(counts)
 	}
-
-	fmt.Println(a.Counts)
-
-	out, err := json.MarshalIndent(a.Counts[0:amount], "", "  ")
-	if err != nil {
-		fmt.Println(err)
+	maxLen := GetMaxLen(counts[0:amount])
+	if maxLen > 16 {
+		maxLen = 16
 	}
-
-	fmt.Println(string(out))
-}
-
-func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
-	defer wg.Done()
-	var records []*Record
-	data, err := os.ReadFile(path)
-	if err != nil {
-		log.Fatalln(err)
+	for _, i := range counts[0:amount] {
+		fmt.Printf("%-*s %v\t%v\n", maxLen, i.Name, i.Occurence, i.Percent)
 	}
-	for _, line := range bytes.Split(data, []byte{'\n'}) {
-		var r Record
-		if err := json.Unmarshal(line, &r); err != nil {
-			fmt.Println("json marshalling issue:", err)
-			continue
-		}
-		records = append(records, &r)
-	}
-	f(records)
 }
 
 // returns a list of files
@@ -210,6 +219,14 @@ func (a *Application) storeRecords(records []*Record) {
 
 }
 
+func (a *Application) syncServiceCounter(sc map[string]int) {
+	a.Mx.Lock()
+	defer a.Mx.Unlock()
+	for k, v := range sc {
+		a.ServiceDetails[k] += v
+	}
+}
+
 func (a *Application) stalkService(service string) {
 	if service != "" {
 		var wg sync.WaitGroup
@@ -217,11 +234,13 @@ func (a *Application) stalkService(service string) {
 			wg.Add(1)
 			go func(l []*Record, s string) {
 				defer wg.Done()
+				vals := make(map[string]int)
 				for _, i := range l {
 					if i.Unit == s {
-						fmt.Println(i.Priority, string(InterfaceToByteSlice(i.Message)))
+						vals[fmt.Sprintf("%v -%v", i.Priority, string(InterfaceToByteSlice(i.Message)))]++
 					}
 				}
+				a.syncServiceCounter(vals)
 			}(load, service)
 		}
 		wg.Wait()
@@ -269,4 +288,22 @@ func WalkFiles(files []string, step int) [][]string {
 		fileList = append(fileList, files[i:end])
 	}
 	return fileList
+}
+
+func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
+	defer wg.Done()
+	var records []*Record
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	for _, line := range bytes.Split(data, []byte{'\n'}) {
+		var r Record
+		if err := json.Unmarshal(line, &r); err != nil {
+			fmt.Println("json marshalling issue:", err)
+			continue
+		}
+		records = append(records, &r)
+	}
+	f(records)
 }
