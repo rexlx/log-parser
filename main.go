@@ -15,7 +15,7 @@ import (
 )
 
 type Counter struct {
-	Name      string  `json:"unit_name"`
+	Name      string  `json:"data"`
 	Occurence int     `json:"occurence"`
 	Percent   float64 `json:"percent"`
 }
@@ -27,6 +27,8 @@ type Application struct {
 	Counts         []Counter
 	Result         map[string]int
 	Mx             *sync.RWMutex
+	TotalRead      int
+	ErrorDetected  int
 }
 
 type Record struct {
@@ -85,7 +87,21 @@ func main() {
 	}
 }
 
+func (a *Application) processWorkload(level int64) {
+	var wg sync.WaitGroup
+	for _, job := range a.WorkLoad {
+		wg.Add(1)
+		go func(job []*Record, level int64) {
+			defer wg.Done()
+			a.getStats(job, level)
+		}(job, level)
+	}
+	wg.Wait()
+}
+
 func (a *Application) createWorkload(size int) {
+	a.Mx.Lock()
+	defer a.Mx.Unlock()
 	var allData [][]*Record
 	total := len(a.Data)
 	if total < size {
@@ -102,6 +118,7 @@ func (a *Application) createWorkload(size int) {
 		}
 	}
 	a.WorkLoad = allData
+	a.Data = nil
 }
 
 func (a *Application) syncResults(result map[string]int) {
@@ -129,35 +146,26 @@ func (a *Application) getStats(records []*Record, level int64) {
 	// fmt.Println(len(records), "records processed..")
 }
 
-func (a *Application) processWorkload(level int64) {
-	var wg sync.WaitGroup
-	for _, job := range a.WorkLoad {
-		wg.Add(1)
-		go func(job []*Record, level int64) {
-			defer wg.Done()
-			a.getStats(job, level)
-		}(job, level)
-	}
-	wg.Wait()
-}
-
-func GetMaxLen(c []Counter) int {
-	l := c[0]
-	for _, s := range c {
-		if len(s.Name) > len(l.Name) {
-			l = s
-		}
-	}
-	return len(l.Name)
-}
-
 func (a *Application) summarizeResults(results map[string]int, amount int) {
 	if len(results) < 1 {
+		fmt.Println("empty results")
 		return
 	}
 	var counts []Counter
+	var total int
+
 	for k, v := range results {
-		p := (float64(v) / float64(len(a.Data)) * 100)
+		if k == "_total" || k == "_error" {
+			continue
+		}
+		total += v
+	}
+
+	for k, v := range results {
+		if k == "_total" || k == "_error" {
+			continue
+		}
+		p := (float64(v) / float64(total) * 100)
 
 		counts = append(counts, Counter{
 			Name:      k,
@@ -172,12 +180,13 @@ func (a *Application) summarizeResults(results map[string]int, amount int) {
 		amount = len(counts)
 	}
 	maxLen := GetMaxLen(counts[0:amount])
-	if maxLen > 16 {
-		maxLen = 16
+	if maxLen > 31 {
+		maxLen = 31
 	}
 	for _, i := range counts[0:amount] {
-		fmt.Printf("%-*s %v\t%v\n", maxLen, i.Name, i.Occurence, i.Percent)
+		fmt.Printf("%-*s %v > %v\n", maxLen, i.Name, i.Occurence, i.Percent)
 	}
+	// counts = nil
 }
 
 // returns a list of files
@@ -223,11 +232,11 @@ func (a *Application) stalkService(service string, amount int) {
 		var wg sync.WaitGroup
 		for _, load := range a.WorkLoad {
 			wg.Add(1)
-			go func(l []*Record, s string) {
+			go func(load []*Record, svc string) {
 				defer wg.Done()
 				vals := make(map[string]int)
-				for _, i := range l {
-					if i.Unit == s {
+				for _, i := range load {
+					if i.Unit == svc {
 						vals[fmt.Sprintf("%v -%v", i.Priority, string(InterfaceToByteSlice(i.Message)))]++
 					}
 				}
@@ -256,6 +265,19 @@ func (a *Application) stalkService(service string, amount int) {
 			fmt.Printf("%-*s %v\n", maxLen, i.Name, i.Occurence)
 		}
 	}
+}
+
+func GetMaxLen(c []Counter) int {
+	if len(c) > 0 {
+		l := c[0]
+		for _, s := range c {
+			if len(s.Name) > len(l.Name) {
+				l = s
+			}
+		}
+		return len(l.Name)
+	}
+	return 0
 }
 
 func InterfaceToByteSlice(i interface{}) []byte {
