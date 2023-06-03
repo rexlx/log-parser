@@ -3,7 +3,9 @@ in progress. please help (or don't).
 
 ### build
 ```
-go build -o log-parser ./main.go
+git clone https://github.com/rexlx/log-parser.git
+cd log-parser/
+go build -o log-parser ./*.go
 ```
 
 ### pipe logs to the parser
