@@ -16,7 +16,7 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 	for scanner.Scan() {
 		select {
 		case <-tick.C:
-			if len(records) > 10 {
+			if len(records) > 2 {
 				a.storeRecords(records)
 				records = nil
 			}
