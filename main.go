@@ -50,20 +50,21 @@ func main() {
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 		app.scanStream(sigs, scanner, *stalk, *amount)
+	} else {
+		fileList := WalkFiles(files, *rate)
+
+		for _, i := range fileList {
+			// we block here instead using go routines for the sake of the cpu
+			app.getRecords(*path, i)
+		}
+
+		app.createWorkload(*step)
+		app.processWorkload(*level)
+		app.stalkService(*stalk, *amount)
+		SummarizeResults(app.Result, *amount)
+
+		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	}
 
-	// otherwise scan was not supplied and we are reading in files
-	fileList := WalkFiles(files, *rate)
-
-	for _, i := range fileList {
-		// we block here instead using go routines for the sake of the cpu
-		app.getRecords(*path, i)
-	}
-
-	app.createWorkload(*step)
-	app.processWorkload(*level)
-	app.stalkService(*stalk, *amount)
-	SummarizeResults(app.Result, *amount)
-
-	fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
+	fmt.Println("done.")
 }

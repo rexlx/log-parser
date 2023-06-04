@@ -16,7 +16,10 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 	for scanner.Scan() {
 		select {
 		case <-tick.C:
-			a.storeRecords(records)
+			if len(records) > 10 {
+				a.storeRecords(records)
+				records = nil
+			}
 		case sig := <-sigs:
 			fmt.Println("received a sign that it is time to die")
 			switch sig {
@@ -48,6 +51,9 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 					fmt.Print("\033[2J")
 					a.stalkService(stalk, amount)
 				}
+			}
+			if len(records) > 20 {
+				a.storeRecords(records)
 				records = nil
 			}
 			// time.Sleep(25 * time.Millisecond)
