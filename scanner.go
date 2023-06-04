@@ -28,6 +28,9 @@ func (a *Application) scanStream(scanner *bufio.Scanner, stalk string, amount in
 				fmt.Println(err)
 				continue
 			}
+			if obj.Unit == "" {
+				obj.Unit = obj.LogID
+			}
 			records = append(records, &obj)
 
 			if len(a.Data) > 9 {
@@ -35,12 +38,10 @@ func (a *Application) scanStream(scanner *bufio.Scanner, stalk string, amount in
 				a.processWorkload(6)
 				if stalk == "" {
 					fmt.Print("\033[2J")
-					a.summarizeResults(a.Result, 25)
+					SummarizeResults(a.Result, 25)
 				} else {
 					fmt.Print("\033[2J")
 					a.stalkService(stalk, amount)
-					// a.summarizeResults(a.ServiceDetails, 5)
-					// a.summarizeResults(6)
 				}
 				records = nil
 			}

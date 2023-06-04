@@ -78,7 +78,7 @@ func main() {
 		app.createWorkload(*step)
 		app.processWorkload(*level)
 		app.stalkService(*stalk, *amount)
-		app.summarizeResults(app.Result, *amount)
+		SummarizeResults(app.Result, *amount)
 
 		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	} else {
@@ -144,49 +144,6 @@ func (a *Application) getStats(records []*Record, level int64) {
 	}
 	a.syncResults(stats)
 	// fmt.Println(len(records), "records processed..")
-}
-
-func (a *Application) summarizeResults(results map[string]int, amount int) {
-	if len(results) < 1 {
-		fmt.Println("empty results")
-		return
-	}
-	var counts []Counter
-	var total int
-
-	for k, v := range results {
-		if k == "_total" || k == "_error" {
-			continue
-		}
-		total += v
-	}
-
-	for k, v := range results {
-		if k == "_total" || k == "_error" {
-			continue
-		}
-		p := (float64(v) / float64(total) * 100)
-
-		counts = append(counts, Counter{
-			Name:      k,
-			Occurence: v,
-			Percent:   p,
-		})
-
-	}
-	SortCounts(counts)
-
-	if amount > len(counts) {
-		amount = len(counts)
-	}
-	maxLen := GetMaxLen(counts[0:amount])
-	if maxLen > 31 {
-		maxLen = 31
-	}
-	for _, i := range counts[0:amount] {
-		fmt.Printf("%-*s %v > %v\n", maxLen, i.Name, i.Occurence, i.Percent)
-	}
-	// counts = nil
 }
 
 // returns a list of files
@@ -339,4 +296,47 @@ func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
 		records = append(records, &r)
 	}
 	f(records)
+}
+
+func SummarizeResults(results map[string]int, amount int) {
+	if len(results) < 1 {
+		fmt.Println("empty results")
+		return
+	}
+	var counts []Counter
+	var total int
+
+	for k, v := range results {
+		if k == "_total" || k == "_error" {
+			continue
+		}
+		total += v
+	}
+
+	for k, v := range results {
+		if k == "_total" || k == "_error" {
+			continue
+		}
+		p := (float64(v) / float64(total) * 100)
+
+		counts = append(counts, Counter{
+			Name:      k,
+			Occurence: v,
+			Percent:   p,
+		})
+
+	}
+	SortCounts(counts)
+
+	if amount > len(counts) {
+		amount = len(counts)
+	}
+	maxLen := GetMaxLen(counts[0:amount])
+	if maxLen > 31 {
+		maxLen = 31
+	}
+	for _, i := range counts[0:amount] {
+		fmt.Printf("%-*s %*v > %v\n", maxLen, i.Name, 8, i.Occurence, i.Percent)
+	}
+	// counts = nil
 }
