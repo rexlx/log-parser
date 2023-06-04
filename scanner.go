@@ -11,7 +11,7 @@ import (
 
 func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, stalk string, amount int) {
 	var records []*Record
-	tick := time.NewTicker(666 * time.Millisecond)
+	tick := time.NewTicker(50 * time.Millisecond)
 	fmt.Println("scanning...")
 	for scanner.Scan() {
 		select {
@@ -41,9 +41,9 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 			}
 			records = append(records, &obj)
 
-			if len(a.Data) > 9 {
+			if len(a.Data) > 10 {
 				a.createWorkload(10)
-				a.processWorkload(6)
+				a.processWorkload(5)
 				if stalk == "" {
 					fmt.Print("\033[2J")
 					SummarizeResults(a.Result, 25)
@@ -52,7 +52,7 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 					a.stalkService(stalk, amount)
 				}
 			}
-			if len(records) > 20 {
+			if len(records) > 50 {
 				a.storeRecords(records)
 				records = nil
 			}
