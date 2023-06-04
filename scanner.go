@@ -4,24 +4,29 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 )
 
-func (a *Application) scanStream(scanner *bufio.Scanner, stalk string, amount int) {
+func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, stalk string, amount int) {
 	var records []*Record
-	// var c int
 	tick := time.NewTicker(666 * time.Millisecond)
-	end := time.After(666 * time.Minute)
 	fmt.Println("scanning...")
 	for scanner.Scan() {
 		select {
 		case <-tick.C:
 			a.storeRecords(records)
-		case <-end:
-			fmt.Println("im too old for this shit...")
+		case sig := <-sigs:
+			fmt.Println("received a sign that it is time to die")
+			switch sig {
+			case syscall.SIGINT:
+				fmt.Print("sigint")
+			case syscall.SIGTERM:
+				fmt.Println("sigterm")
+			}
+			os.Exit(0)
 		default:
-			// c++
-			// fmt.Println("TOTAL:", c)
 			var obj Record
 			err := json.Unmarshal([]byte(scanner.Text()), &obj)
 			if err != nil {
