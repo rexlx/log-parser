@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
 
 type Application struct {
@@ -13,9 +15,14 @@ type Application struct {
 	Data           []*Record
 	Counts         []Counter
 	Result         map[string]int
+	Stats          Stats
 	Mx             *sync.RWMutex
-	TotalRead      int
-	ErrorDetected  int
+}
+
+type Stats struct {
+	Start   time.Time
+	Now     time.Time
+	Runtime time.Duration
 }
 
 func (a *Application) processWorkload(level int64) {
@@ -153,4 +160,13 @@ func (a *Application) stalkService(service string, amount int) {
 			fmt.Printf("%-*s %v\n", maxLen, i.Name, i.Occurence)
 		}
 	}
+}
+
+func (a *Application) printToScreen(msg string) {
+	a.Stats.Now = time.Now()
+	a.Stats.Runtime = time.Since(a.Stats.Start)
+	fmt.Print("\033[2J")
+	header := fmt.Sprintf("Initialized: %v | Runtime: %v | Date: %v\n\n", a.Stats.Start.Format(time.RFC822), a.Stats.Runtime, a.Stats.Now.Format(time.RFC822))
+	footer := strings.Repeat("_", len(header))
+	fmt.Printf("\n%v\n%v\n%v", header, msg, footer)
 }

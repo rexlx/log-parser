@@ -79,15 +79,19 @@ func readInFile(wg *sync.WaitGroup, path string, f func(r []*Record)) {
 			fmt.Println("json marshalling issue:", err)
 			continue
 		}
+		if r.Unit == "" {
+			r.Unit = r.LogID
+		}
 		records = append(records, &r)
 	}
 	f(records)
 }
 
-func SummarizeResults(results map[string]int, amount int) {
+func SummarizeResults(results map[string]int, amount int) string {
+	var msg string
 	if len(results) < 1 {
 		fmt.Println("empty results")
-		return
+		return "empty results for this period"
 	}
 	var counts []Counter
 	var total int
@@ -122,7 +126,7 @@ func SummarizeResults(results map[string]int, amount int) {
 		maxLen = 31
 	}
 	for _, i := range counts[0:amount] {
-		fmt.Printf("%-*s %*v > %v\n", maxLen, i.Name, 8, i.Occurence, i.Percent)
+		msg += fmt.Sprintf("%-*s %*v > %v\n", maxLen, i.Name, 8, i.Occurence, i.Percent)
 	}
-	// counts = nil
+	return msg
 }

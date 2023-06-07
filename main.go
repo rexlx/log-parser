@@ -43,6 +43,8 @@ func main() {
 		ServiceDetails: serviceDetails,
 	}
 
+	app.Stats.Start = time.Now()
+
 	// the scanner will run forever unless it catches a sigint or sigterm,
 	// in which case it exits with 0; the code below *should* not run (...)
 	if *scan {
@@ -61,7 +63,7 @@ func main() {
 		app.createWorkload(*step)
 		app.processWorkload(*level)
 		app.stalkService(*stalk, *amount)
-		SummarizeResults(app.Result, *amount)
+		app.printToScreen(SummarizeResults(app.Result, *amount))
 
 		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
 	}

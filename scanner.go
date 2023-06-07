@@ -17,7 +17,7 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 		select {
 		case <-tick.C:
 			if len(records) > 2 {
-				a.storeRecords(records)
+				a.Data = append(a.Data, records...)
 				records = nil
 			}
 		case sig := <-sigs:
@@ -45,15 +45,15 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 				a.createWorkload(10)
 				a.processWorkload(5)
 				if stalk == "" {
-					fmt.Print("\033[2J")
-					SummarizeResults(a.Result, 25)
+					// fmt.Print("\033[2J")
+					a.printToScreen(SummarizeResults(a.Result, 25))
 				} else {
-					fmt.Print("\033[2J")
+					// fmt.Print("\033[2J")
 					a.stalkService(stalk, amount)
 				}
 			}
 			if len(records) > 50 {
-				a.storeRecords(records)
+				a.Data = append(a.Data, records...)
 				records = nil
 			}
 			// time.Sleep(25 * time.Millisecond)
