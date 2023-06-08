@@ -16,12 +16,12 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 	for scanner.Scan() {
 		select {
 		case <-tick.C:
-			if len(records) > 2 {
+			if len(records) > 0 {
 				a.Data = append(a.Data, records...)
 				records = nil
 			}
 		case sig := <-sigs:
-			fmt.Println("received a sign that it is time to die")
+			fmt.Println("\nreceived a sign that it is time to die")
 			switch sig {
 			case syscall.SIGINT:
 				fmt.Print("sigint")
@@ -43,7 +43,7 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 
 			if len(a.Data) > 10 {
 				a.createWorkload(10)
-				a.processWorkload(5)
+				a.processWorkload(6)
 				if stalk == "" {
 					// fmt.Print("\033[2J")
 					a.printToScreen(SummarizeResults(a.Result, 25))
@@ -52,10 +52,10 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 					a.stalkService(stalk, amount)
 				}
 			}
-			if len(records) > 50 {
-				a.Data = append(a.Data, records...)
-				records = nil
-			}
+			// if len(records) > 50 {
+			// 	a.Data = append(a.Data, records...)
+			// 	records = nil
+			// }
 			// time.Sleep(25 * time.Millisecond)
 			// tick.Stop()
 		}

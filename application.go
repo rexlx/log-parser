@@ -74,7 +74,7 @@ func (a *Application) getStats(records []*Record, level int64) {
 
 	for _, record := range records {
 		// _ = InterfaceToByteSlice(record.Message)
-		if record.Priority < level {
+		if record.Priority <= level {
 			stats["_error"]++
 		}
 		stats[record.Unit]++
@@ -123,6 +123,7 @@ func (a *Application) syncServiceCounter(sc map[string]int) {
 
 func (a *Application) stalkService(service string, amount int) {
 	if service != "" {
+		var msg string
 		var pairs []Counter
 		var wg sync.WaitGroup
 		for _, load := range a.WorkLoad {
@@ -157,8 +158,9 @@ func (a *Application) stalkService(service string, amount int) {
 			maxLen = 16
 		}
 		for _, i := range pairs[0:amount] {
-			fmt.Printf("%-*s %v\n", maxLen, i.Name, i.Occurence)
+			msg += fmt.Sprintf("%-*s %v\n", maxLen, i.Name, i.Occurence)
 		}
+		a.printToScreen(msg)
 	}
 }
 
