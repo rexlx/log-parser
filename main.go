@@ -51,7 +51,7 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		sigs := make(chan os.Signal, 1)
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-		app.scanStream(sigs, scanner, *stalk, *amount)
+		app.scanStream(sigs, scanner)
 	} else {
 		fileList := WalkFiles(files, *rate)
 

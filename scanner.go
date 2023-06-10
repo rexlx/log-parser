@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, stalk string, amount int) {
+func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner) {
 	var records []*Record
 	tick := time.NewTicker(50 * time.Millisecond)
 	fmt.Println("scanning...")
@@ -43,21 +43,15 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner, st
 
 			if len(a.Data) > 10 {
 				a.createWorkload(10)
-				a.processWorkload(6)
-				if stalk == "" {
+				a.processWorkload(*level)
+				if *stalk == "" {
 					// fmt.Print("\033[2J")
-					a.printToScreen(SummarizeResults(a.Result, 25))
+					a.printToScreen(SummarizeResults(a.Result, *amount))
 				} else {
 					// fmt.Print("\033[2J")
-					a.stalkService(stalk, amount)
+					a.stalkService(*stalk, *amount)
 				}
 			}
-			// if len(records) > 50 {
-			// 	a.Data = append(a.Data, records...)
-			// 	records = nil
-			// }
-			// time.Sleep(25 * time.Millisecond)
-			// tick.Stop()
 		}
 	}
 	if err := scanner.Err(); err != nil {

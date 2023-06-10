@@ -23,6 +23,8 @@ type Stats struct {
 	Start   time.Time
 	Now     time.Time
 	Runtime time.Duration
+	Error   int
+	Total   int
 }
 
 func (a *Application) processWorkload(level int64) {
@@ -63,6 +65,12 @@ func (a *Application) syncResults(result map[string]int) {
 	a.Mx.Lock()
 	defer a.Mx.Unlock()
 	for k, v := range result {
+		if k == "_error" {
+			a.Stats.Error += v
+		}
+		if k == "_total" {
+			a.Stats.Total += v
+		}
 		a.Result[k] += v
 	}
 }
@@ -75,6 +83,7 @@ func (a *Application) getStats(records []*Record, level int64) {
 	for _, record := range records {
 		// _ = InterfaceToByteSlice(record.Message)
 		if record.Priority <= level {
+			fmt.Println(record.Priority, level, "YEYEYEYE")
 			stats["_error"]++
 		}
 		stats[record.Unit]++
@@ -168,7 +177,11 @@ func (a *Application) printToScreen(msg string) {
 	a.Stats.Now = time.Now()
 	a.Stats.Runtime = time.Since(a.Stats.Start)
 	fmt.Print("\033[2J")
-	header := fmt.Sprintf("Initialized: %v | Runtime: %v | Date: %v\n\n", a.Stats.Start.Format(time.RFC822), a.Stats.Runtime, a.Stats.Now.Format(time.RFC822))
-	footer := strings.Repeat("_", len(header))
-	fmt.Printf("\n%v\n%v\n%v", header, msg, footer)
+	header := fmt.Sprintf("Initialized: %v | Runtime: %v | Date: %v", a.Stats.Start.Format(time.RFC822), a.Stats.Runtime, a.Stats.Now.Format(time.RFC822))
+	// fmt.Sprintf("%-*s %*v > %v\n", maxLen, i.Name, 8, i.Occurence, i.Percent)
+	stats := fmt.Sprintf(" Logs Parsed: %v | Error Rate: %v ", a.Stats.Total, float64(a.Stats.Error)/float64(a.Stats.Total)*100)
+	diff := len(header) - len(stats)
+	pad := strings.Repeat("-", diff/2)
+	footer := fmt.Sprintf("%v %v %v", pad, stats, pad)
+	fmt.Printf("\n%v\n%v\n%v\n%v\n", header, strings.Repeat("_", len(header)), msg, footer)
 }
