@@ -83,7 +83,6 @@ func (a *Application) getStats(records []*Record, level int64) {
 	for _, record := range records {
 		// _ = InterfaceToByteSlice(record.Message)
 		if record.Priority <= level {
-			fmt.Println(record.Priority, level, "YEYEYEYE")
 			stats["_error"]++
 		}
 		stats[record.Unit]++

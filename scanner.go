@@ -11,7 +11,7 @@ import (
 
 func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner) {
 	var records []*Record
-	tick := time.NewTicker(50 * time.Millisecond)
+	tick := time.NewTicker(150 * time.Millisecond)
 	fmt.Println("scanning...")
 	for scanner.Scan() {
 		select {
