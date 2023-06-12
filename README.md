@@ -22,9 +22,9 @@ log-parser -src /s/b/logs -read 20 -stalk ssh.service $(ls /s/b/logs | tr '\n' '
 ```
 
 
-### example
+### examples
 ```
-log-parser -src /s/b/logs -read 500 -level 4 $(ls /s/b/logs | tr '\n' ' ')
+$ log-parser -src /s/b/logs -read 500 -level 4 $(ls /s/b/logs | tr '\n' ' ')
 
 Initialized: 10 Jun 23 09:46 CDT | Runtime: 2.632620643s | Date: 10 Jun 23 09:46 CDT
 ____________________________________________________________________________________
@@ -59,4 +59,37 @@ session-c2.scope           1566 > 0.08650222773617153
 
 read 233 files and processed 1810358 records in 2.632729252 seconds
 done.
+```
+<br>
+```
+$ journalctl -f -o json | tr '[:upper:]' '[:lower:]' | log-parser -scan -level 4 -stalk rsyslog.service
+Initialized: 10 Jun 23 15:04 CDT | Runtime: 45h52m4.782478013s | Date: 12 Jun 23 12:56 CDT
+__________________________________________________________________________________________
+5 - test actions 8 cpus 12627
+5 - test actions 4 cpus 12515
+5 - test actions 12 cpus 12503
+6 - starting sysstat-collect.service - system activity accounting tool... 823
+6 - sysstat-collect.service: deactivated successfully. 693
+6 - finished sysstat-collect.service - system activity accounting tool. 627
+5 - service_start pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0
+5 - service_stop pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0
+6 - starting pmlogger_farm_check.service - check and migrate non-primary pmlogger farm instances... 275
+6 - starting pmie_farm_check.service - check and migrate non-primary pmie farm instances... 273
+6 - starting pmie_check.service - check pmie instances are running... 272
+6 - starting pmlogger_check.service - check pmlogger instances are running... 262
+6 - started pmie_check.service - check pmie instances are running. 257
+6 - started pmie_farm_check.service - check and migrate non-primary pmie farm instances. 250
+6 - started pmlogger_farm_check.service - check and migrate non-primary pmlogger farm instances. 250
+6 - started pmlogger_check.service - check pmlogger instances are running. 234
+6 - pmlogger_farm_check.service: deactivated successfully. 220
+6 - pmie_farm_check.service: deactivated successfully. 219
+6 - pmlogger_check.service: deactivated successfully. 215
+5 - service_start pid=1 uid=0 auid=4294967295 ses=4294967295 subj=kernel msg='unit=sysstat-collect
+5 - service_stop pid=1 uid=0 auid=4294967295 ses=4294967295 subj=kernel msg='unit=sysstat-collect
+6 - pmie_check.service: deactivated successfully. 208
+5 - service_start pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 
+5 - service_start pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 
+5 - service_start pid=1 uid=0 auid=4294967295 ses=4294967295 subj=system_u:system_r:init_t:s0 
+
+------------------  Logs Parsed: 102845 | Error Rate: 2.140113763430405  ------------------
 ```
