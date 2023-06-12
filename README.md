@@ -60,7 +60,9 @@ session-c2.scope           1566 > 0.08650222773617153
 read 233 files and processed 1810358 records in 2.632729252 seconds
 done.
 ```
+
 <br>
+
 ```
 $ journalctl -f -o json | tr '[:upper:]' '[:lower:]' | log-parser -scan -level 4 -stalk rsyslog.service
 Initialized: 10 Jun 23 15:04 CDT | Runtime: 45h52m4.782478013s | Date: 12 Jun 23 12:56 CDT
