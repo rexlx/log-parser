@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -81,7 +79,6 @@ func (a *Application) getStats(records []*Record, level int64) {
 	stats["_total"] = 0
 
 	for _, record := range records {
-		// _ = InterfaceToByteSlice(record.Message)
 		if record.Priority <= level {
 			stats["_error"]++
 		}
@@ -89,27 +86,16 @@ func (a *Application) getStats(records []*Record, level int64) {
 		stats["_total"]++
 	}
 	a.syncResults(stats)
-	// fmt.Println(len(records), "records processed..")
 }
 
-// returns a list of files
-func (a *Application) getRecords(path string, files []string) {
-	fInfo, err := os.Stat(path)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	if fInfo.IsDir() && len(files) > 0 {
+func (a *Application) getRecords(files []string) {
+	if len(files) > 0 {
 		var wg sync.WaitGroup
 		wg.Add(len(files))
 		for _, fh := range files {
-			go readInFile(&wg, filepath.Join(path, fh), a.storeRecords)
+			go readInFile(&wg, fh, a.storeRecords)
 		}
-		wg.Wait()
-	} else {
-		var wg sync.WaitGroup
-		wg.Add(1)
-		readInFile(&wg, path, a.storeRecords)
+
 		wg.Wait()
 	}
 }
@@ -148,9 +134,7 @@ func (a *Application) stalkService(service string, amount int) {
 			}(load, service)
 		}
 		wg.Wait()
-		// sort.Slice(counts, func(i, j int) bool {
-		// 	return counts[i].Occurence > counts[j].Occurence
-		// })
+
 		for k, v := range a.ServiceDetails {
 			pairs = append(pairs, Counter{
 				Name:      k,
@@ -177,7 +161,6 @@ func (a *Application) printToScreen(msg string) {
 	a.Stats.Runtime = time.Since(a.Stats.Start)
 	fmt.Print("\033[2J")
 	header := fmt.Sprintf("Initialized: %v | Runtime: %v | Date: %v", a.Stats.Start.Format(time.RFC822), a.Stats.Runtime, a.Stats.Now.Format(time.RFC822))
-	// fmt.Sprintf("%-*s %*v > %v\n", maxLen, i.Name, 8, i.Occurence, i.Percent)
 	stats := fmt.Sprintf(" Logs Parsed: %v | Error Rate: %v ", a.Stats.Total, float64(a.Stats.Error)/float64(a.Stats.Total)*100)
 	diff := len(header) - len(stats)
 	pad := strings.Repeat("-", diff/2)

@@ -27,8 +27,6 @@ func main() {
 
 	// get the flags
 	flag.Parse()
-	// and the trailing args too
-	files := flag.Args()
 
 	// the application type will need two maps like this
 	results := make(map[string]int)
@@ -53,11 +51,11 @@ func main() {
 		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 		app.scanStream(sigs, scanner)
 	} else {
-		fileList := WalkFiles(files, *rate)
+		fileList := WalkFiles(*path, *rate)
 
 		for _, i := range fileList {
 			// we block here instead using go routines for the sake of the cpu
-			app.getRecords(*path, i)
+			app.getRecords(i)
 		}
 
 		app.createWorkload(*step)
@@ -65,7 +63,7 @@ func main() {
 		app.stalkService(*stalk, *amount)
 		app.printToScreen(SummarizeResults(app.Result, *amount))
 
-		fmt.Printf("\n\nread %v files and processed %v records in %v seconds\n", len(files), app.Result["_total"], time.Since(start).Seconds())
+		fmt.Printf("\nprocessed %v records in %v seconds\n", app.Result["_total"], time.Since(start).Seconds())
 	}
 
 	fmt.Println("done.")

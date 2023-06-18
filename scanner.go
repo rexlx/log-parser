@@ -21,7 +21,7 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner) {
 				records = nil
 			}
 		case sig := <-sigs:
-			fmt.Println("\nreceived a sign that it is time to die")
+			fmt.Println("received a sign that it is time to die")
 			switch sig {
 			case syscall.SIGINT:
 				fmt.Print("sigint")
@@ -45,10 +45,8 @@ func (a *Application) scanStream(sigs chan os.Signal, scanner *bufio.Scanner) {
 				a.createWorkload(10)
 				a.processWorkload(*level)
 				if *stalk == "" {
-					// fmt.Print("\033[2J")
 					a.printToScreen(SummarizeResults(a.Result, *amount))
 				} else {
-					// fmt.Print("\033[2J")
 					a.stalkService(*stalk, *amount)
 				}
 			}

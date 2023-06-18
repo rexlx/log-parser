@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 )
@@ -21,6 +23,14 @@ func GetMaxLen(c []Counter) int {
 		return len(l.Name)
 	}
 	return 0
+}
+
+func GetFiles(path string, files []fs.DirEntry) []string {
+	var res []string
+	for _, entry := range files {
+		res = append(res, filepath.Join(path, entry.Name()))
+	}
+	return res
 }
 
 func InterfaceToByteSlice(i interface{}) []byte {
@@ -48,8 +58,28 @@ func SortCounts(counts []Counter) {
 	})
 }
 
-func WalkFiles(files []string, step int) [][]string {
+func WalkFiles(path string, step int) [][]string {
 	var fileList [][]string
+
+	fInfo, err := os.Stat(path)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if !fInfo.IsDir() {
+		files := []string{path}
+		fileList = append(fileList, files)
+		return fileList
+	}
+
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Printf("working on %v files", len(entries))
+
+	files := GetFiles(path, entries)
 	if len(files) <= step {
 		fileList = append(fileList, files)
 		return fileList
