@@ -1,5 +1,5 @@
 # little log parser
-in progress. please help (or don't).
+in progress.
 
 ### build
 ```
@@ -16,15 +16,14 @@ journalctl -f -o json | tr '[:upper:]' '[:lower:]' | log-parser -scan -stalk pmi
 
 ### read in data from files
 ```
-# all trailing args are the files you want to read in. future versions will not require the src directory and file list
 # to run as fast as humanly possible set the read value higher than you think you should
-log-parser -src /s/b/logs -read 20 -stalk ssh.service $(ls /s/b/logs | tr '\n' ' ')
+log-parser -src /s/b/logs -read 20 -stalk ssh.service
 ```
 
 
 ### examples
 ```
-$ log-parser -src /s/b/logs -read 500 -level 4 $(ls /s/b/logs | tr '\n' ' ')
+$ log-parser -src /s/b/logs -read 500 -level 4
 
 Initialized: 10 Jun 23 09:46 CDT | Runtime: 2.632620643s | Date: 10 Jun 23 09:46 CDT
 ____________________________________________________________________________________
